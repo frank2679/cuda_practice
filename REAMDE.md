@@ -1,1 +1,0 @@
-[CUDA-Optimization-Guide](https://github.com/XiaoSong9905/CUDA-Optimization-Guide)
