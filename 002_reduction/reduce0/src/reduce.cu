@@ -15,74 +15,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char *argv[]) {
-  // Grab n from the command line args
-  const unsigned int n = parse_args(argc, argv);
+// assume dev_input, dev_output are allocated
+void reduce_yh_host(float *dev_input, float *dev_output, int n) {
+  unsigned int remaining = n;
+  unsigned int threads_needed = n / 2;
+  unsigned int blocks = threads_needed / 1024 + (threads_needed % 1024 ? 1 : 0);
+  unsigned int block_threads;
 
-  // Query device to find max num threads per block
-  const int block_threads = get_max_block_threads();
-  printf("max threads per block: %d\n", block_threads);
+  if (blocks > 0) {
+    block_threads = 1024;
+  } else {
+    block_threads = threads_needed;
+    blocks = 1;
+  }
 
-  // Prepare timer objects to track performance
-  Perf perf = create_perf();
+  while (remaining > 1) {
+    reduce_yh<<<blocks, block_threads>>>(dev_input, dev_output, remaining);
+    remaining = blocks;
+    threads_needed = remaining / 2;
+    blocks = threads_needed / 1024;
+    if (blocks > 0) {
+      block_threads = 1024;
+    } else {
+      block_threads = threads_needed;
+      blocks = 1;
+    }
+    if (remaining > 1) {
+      float *dev_tmp = dev_input;
+      dev_input = dev_output;
+      dev_output = dev_tmp;
+    }
+  }
+}
 
-  // All CUDA API calls return a status, which we must check
-  cudaError_t status;
-
-  // Host buffers
-  float *host_array;
-  float final_sum;
-
-  // Device buffers
-  float *dev_input;
-  float *dev_output;
-  float *dev_temp; // temp pointer used to flip buffers between kernel
-                   // launches (see loop below)
-
+void reduce_host(float *dev_input, float *dev_output, int n) {
+  unsigned int remaining = n; // tracks number of elements left to add
   // Size info for kernel launches
   unsigned int threads_needed;
   unsigned int blocks;
-  unsigned int remaining; // number of elements left to add
+  const int block_threads = get_max_block_threads();
 
-  // Allocate host buffer and fill it
-  host_array = (float *)malloc(n * sizeof(float));
-  init_array(host_array, n);
-
-  // Allocate device buffers
-  // Note: Input buffer needs to be of size n.
-  // Output buffer is used to store partial results after each kernel launch. On
-  // first launch, each block will reduce block_size * 2 values down to 1 value
-  // (except last kernel, which may reduce less than block_size * 2 values down
-  // to 1 value if  n is not a multiple of block_size * 2). On subsequent
-  // launches, we need even less output buffer space. Therefore output buffer
-  // size needs to be equal to the number of blocks required for first launch.
+  float *dev_temp;        // temp pointer used to flip buffers between kernel
+                          // launches (see loop below)
   threads_needed = n / 2; // we'll need one thread to add every 2 elements
   blocks = threads_needed / block_threads + \ // we'll need this many blocks
            (threads_needed % block_threads > 0
                 ? 1
                 : 0); // plus one extra if threads_needed
                       // does not evenly divide block_threads
-
-  status = cudaMalloc(&dev_input, n * sizeof(float));
-  check_error(status, "Error allocating device buffer.");
-  status = cudaMalloc(&dev_output, blocks * sizeof(float));
-  check_error(status, "Error allocating device buffer.");
-
-  // Start the program timer
-  start_timer(&(perf.total_timer));
-
-  // Transfer the input array from host to device
-  start_timer(&(perf.h2d_timer));
-  status = cudaMemcpy(dev_input, host_array, n * sizeof(float),
-                      cudaMemcpyHostToDevice);
-  stop_timer(&(perf.h2d_timer));
-  check_error(status, "Error on CPU->GPU cudaMemcpy for host_array.");
-
-  // Launch kernel
-  // Note: We call the kernel multiple times - each call reduces the size of the
-  // array by 2.
-  start_timer(&(perf.kernel_timer));
-  remaining = n; // tracks number of elements left to add
   while (remaining >
          1) // continue until we have a single value left (the final sum)
   {
@@ -96,7 +76,7 @@ int main(int argc, char *argv[]) {
 
     // call the kernel
     // reduce<<<blocks, block_threads>>>(dev_input, dev_output, remaining);
-    reduce_yh<<<blocks, block_threads>>>(dev_input, dev_output, remaining);
+    reduce<<<blocks, block_threads>>>(dev_input, dev_output, remaining);
 
     // re-compute our size information for the next iteration
     remaining = blocks; // After the previous kernel call, each block has
@@ -119,6 +99,68 @@ int main(int argc, char *argv[]) {
       dev_output = dev_temp;
     }
   }
+}
+
+int main(int argc, char *argv[]) {
+  // Grab n from the command line args
+  const unsigned int n = parse_args(argc, argv);
+
+  // Query device to find max num threads per block
+  const int block_threads = get_max_block_threads();
+  printf("max threads per block: %d\n", block_threads);
+
+  // Prepare timer objects to track performance
+  Perf perf = create_perf();
+
+  // All CUDA API calls return a status, which we must check
+  cudaError_t status;
+
+  // Host buffers
+  float *host_array;
+  float final_sum;
+
+  // Device buffers
+  float *dev_input;
+  float *dev_output;
+
+  // Size info for kernel launches
+  unsigned int threads_needed;
+  unsigned int blocks;
+  unsigned int remaining; // number of elements left to add
+
+  // Allocate host buffer and fill it
+  host_array = (float *)malloc(n * sizeof(float));
+  init_array(host_array, n);
+
+  // Allocate device buffers
+  // Note: Input buffer needs to be of size n.
+  // Output buffer is used to store partial results after each kernel launch. On
+  // first launch, each block will reduce block_size * 2 values down to 1 value
+  // (except last kernel, which may reduce less than block_size * 2 values down
+  // to 1 value if  n is not a multiple of block_size * 2). On subsequent
+  // launches, we need even less output buffer space. Therefore output buffer
+  // size needs to be equal to the number of blocks required for first launch.
+
+  status = cudaMalloc(&dev_input, n * sizeof(float));
+  check_error(status, "Error allocating device buffer.");
+  status = cudaMalloc(&dev_output, blocks * sizeof(float));
+  check_error(status, "Error allocating device buffer.");
+
+  // Start the program timer
+  start_timer(&(perf.total_timer));
+
+  // Transfer the input array from host to device
+  start_timer(&(perf.h2d_timer));
+  status = cudaMemcpy(dev_input, host_array, n * sizeof(float),
+                      cudaMemcpyHostToDevice);
+  stop_timer(&(perf.h2d_timer));
+  check_error(status, "Error on CPU->GPU cudaMemcpy for host_array.");
+
+  // Launch kernel
+  // Note: We call the kernel multiple times - each call reduces the size of the
+  // array by 2.
+  start_timer(&(perf.kernel_timer));
+  reduce_host(dev_input, dev_output, n);
   stop_timer(&(perf.kernel_timer));
   // Note: the kernel launches in the loop above are asychronous, so this may
   // not necessarily catch kernel errors... If they're not caught here, they'll
