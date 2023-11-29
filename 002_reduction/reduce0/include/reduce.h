@@ -13,6 +13,8 @@
 // If True, host will print debugging information (e.g. thread block sizes, etc.)
 #define DEBUG_INFO 1
 
+#define USE_YH_IMPL 1
+
 /* Prototypes */
 
 void print_results(unsigned int n, float host_result, Timer *total_timer, Timer *copy_to_dev_timer, Timer *copy_to_host_timer, Timer *kernel_timer);

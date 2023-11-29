@@ -77,17 +77,35 @@ unsigned int parse_args(int argc, char *argv[])
         printf("Usage: ./reduce <i, where n = 2^i>\n");
         exit(1);
     }
-    
+
+    // return (unsigned int)atoi(argv[1]);
     return (unsigned int) pow(2, atoi(argv[1]));
 }
 
-// golden
-void cpu_reduce(float *array, int len, float *sum) {
-  float sum_tmp = 0.f;
-  for (int i = 0; i < len; ++i) {
-    sum_tmp += array[i];
+// Kahan summation algorithm to resolve numerical error
+// https://sss.cs.vt.edu/pubs/pldi03.pdf
+/* The Kahan summation algorithm can help reduce the numerical instability in
+floating-point summation by keeping track of the lost precision and adding it
+back to the sum. The algorithm works by using a separate variable to accumulate
+the lost precision, which is then added back to the sum in the next iteration1.
+This helps to reduce the error that accumulates due to the limited precision of
+floating-point numbers.
+
+The Kahan summation algorithm is more accurate than the naive approach of simply
+summing the numbers, especially when summing a large number of values1. However,
+it does come with a performance cost due to the additional operations required
+to keep track of the lost precision1.
+*/
+void cpu_reduce(float *array, int len, float *asum) {
+  float sum = 0.0;
+  float c = 0.0;
+  for (int i = 0; i < len; i++) {
+    float y = array[i] - c;
+    float t = sum + y;
+    c = (t - sum) - y;
+    sum = t;
   }
-  *sum = sum_tmp;
+  *asum = sum;
 }
 
 bool check_result(float golden, float output, float threshold) {
