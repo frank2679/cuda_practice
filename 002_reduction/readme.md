@@ -1,18 +1,22 @@
-- [1. Tips](#1-tips)
+- [1. Summary](#1-summary)
+  - [1.1. Tips](#11-tips)
+  - [1.2. Performance](#12-performance)
 - [2. reduce v0](#2-reduce-v0)
   - [2.1. host 侧 kernel launch 调用](#21-host-侧-kernel-launch-调用)
   - [2.2. reduce kernel](#22-reduce-kernel)
   - [2.3. Summary](#23-summary)
 - [3. reduce v1](#3-reduce-v1)
   - [3.1. kernel](#31-kernel)
+- [reduce v2 pinned memory](#reduce-v2-pinned-memory)
+- [reduce 4 shared memory](#reduce-4-shared-memory)
 
 
 
 [medium, Parallel Reduction with CUDA](https://shreeraman-ak.medium.com/parallel-reduction-with-cuda-d0ae10c1ae2c)
 [github, cuda-reduction-example](https://github.com/umfranzw/cuda-reduction-example), has slides inside
 
-
-## 1. Tips
+## 1. Summary
+### 1.1. Tips
 
 问题
 - 实现层面，需要在该 sync 的地方记得 sync
@@ -21,19 +25,21 @@
 - V0 实现会导致 input 被破坏，不好，最好是不用 inplace 做法。
 - 算法层面犯了一个大错，即一 loop 中，不同 thread 读写到相同位置了。至于为什么第二次 launch 出问题的根本原因还没搞清楚。毕竟也多加了同步了。
 
+### 1.2. Performance
+
+| logn |   V0 |   V1 |   V2 |   V3 |   V4 |
+| ---- | ---: | ---: | ---: | ---: | ---: |
+| 11   |   21 |      |      |      |      |
+| 12   |   35 |      |      |      |      |
+| 21   | 2885 |      |      |      |      |
+| 22   | 2261 |      |      |      |      |
+| 23   | 2383 |      |      |      |      |
 
 
 ## 2. reduce v0
 
 基本算法结构分为两层，一层在 host 侧，一层在 device 侧，device 侧只做 block 内 reduce，host 侧循环调用 device reduce，直到 reduce 到一个值。
 
-| logn | MFLOPs |
-| ---- | -----: |
-| 11   |     21 |
-| 12   |     35 |
-| 21   |   2885 |
-| 22   |   2261 |
-| 23   |   2383 |
 
 > 注意接口只支持 int32_t ，所以输入参数超过 31 将溢出。
 
@@ -156,3 +162,12 @@ __global__ void reduce_yh(float *input, float *output, unsigned int n) {
   }
 }
 ```
+
+## reduce v2 pinned memory
+
+> 容易出现 out of memory 的报错，可以用 export CUDA_VISIBLE_DEVICES=0,1,3 来设置要跑的卡
+
+实测性能提升很多。
+
+## reduce 4 shared memory
+
