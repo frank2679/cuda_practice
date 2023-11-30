@@ -18,7 +18,7 @@
 void reduce_yh_host(float *dev_input, float *dev_output, int n) {
   unsigned int remaining = n;
   unsigned int threads_needed = n / 2;
-  unsigned int blocks = threads_needed / 1024 + (threads_needed % 1024 ? 1 : 0);
+  unsigned int blocks = threads_needed / 1024;
   unsigned int block_threads;
 
   if (blocks > 0) {
@@ -34,6 +34,7 @@ void reduce_yh_host(float *dev_input, float *dev_output, int n) {
     printf("remaining: %u\n", remaining);
     printf("blocks: %u\n", blocks);
     printf("threads_needed: %u\n", threads_needed);
+    printf("block_threads: %u\n", block_threads);
     printf("\n");
 #endif
     reduce_yh<<<blocks, block_threads>>>(dev_input, dev_output, remaining);

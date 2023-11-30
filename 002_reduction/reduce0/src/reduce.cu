@@ -19,7 +19,7 @@
 void reduce_yh_host(float *dev_input, float *dev_output, int n) {
   unsigned int remaining = n;
   unsigned int threads_needed = n / 2;
-  unsigned int blocks = threads_needed / 1024 + (threads_needed % 1024 ? 1 : 0);
+  unsigned int blocks = threads_needed / 1024;
   unsigned int block_threads;
 
   if (blocks > 0) {
