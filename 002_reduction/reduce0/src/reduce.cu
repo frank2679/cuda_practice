@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
 #if USE_YH_IMPL
   reduce_yh_host(dev_input, dev_output, n);
 #else
-  reduce_yh_host(dev_input, dev_output, n);
+  reduce_host(dev_input, dev_output, n);
 #endif
   stop_timer(&(perf.kernel_timer));
   // Note: the kernel launches in the loop above are asychronous, so this may
