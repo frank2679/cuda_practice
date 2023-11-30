@@ -5,7 +5,7 @@
   - [2.1. host 侧 kernel launch 调用](#21-host-侧-kernel-launch-调用)
   - [2.2. reduce kernel](#22-reduce-kernel)
   - [2.3. Summary](#23-summary)
-- [3. reduce v1](#3-reduce-v1)
+- [3. reduce v1 coalescing](#3-reduce-v1-coalescing)
   - [3.1. kernel](#31-kernel)
 - [reduce v2 pinned memory](#reduce-v2-pinned-memory)
 - [reduce 4 shared memory](#reduce-4-shared-memory)
@@ -92,7 +92,7 @@ kernel 内部不能在 block 之间做 reduce，所以需要返回 host 侧，�
 - input 数据在 global memory，被多次读取，成本较高
 
 
-## 3. reduce v1
+## 3. reduce v1 coalescing
 
 做 global memory coalescing
 
