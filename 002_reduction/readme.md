@@ -5,10 +5,10 @@
   - [2.1. host 侧 kernel launch 调用](#21-host-侧-kernel-launch-调用)
   - [2.2. reduce kernel](#22-reduce-kernel)
   - [2.3. Summary](#23-summary)
-- [3. reduce v1 coalescing](#3-reduce-v1-coalescing)
+- [3. reduce v1 **coalescing**](#3-reduce-v1-coalescing)
   - [3.1. kernel](#31-kernel)
-- [reduce v2 pinned memory](#reduce-v2-pinned-memory)
-- [reduce 4 shared memory](#reduce-4-shared-memory)
+- [4. reduce v2 pinned memory](#4-reduce-v2-pinned-memory)
+- [5. reduce 4 shared memory](#5-reduce-4-shared-memory)
 
 
 
@@ -92,7 +92,7 @@ kernel 内部不能在 block 之间做 reduce，所以需要返回 host 侧，�
 - input 数据在 global memory，被多次读取，成本较高
 
 
-## 3. reduce v1 coalescing
+## 3. reduce v1 **coalescing**
 
 做 global memory coalescing
 
@@ -163,11 +163,15 @@ __global__ void reduce_yh(float *input, float *output, unsigned int n) {
 }
 ```
 
-## reduce v2 pinned memory
+## 4. reduce v2 pinned memory
 
 > 容易出现 out of memory 的报错，可以用 export CUDA_VISIBLE_DEVICES=0,1,3 来设置要跑的卡
 
 实测性能提升很多。
 
-## reduce 4 shared memory
+## 5. reduce 4 shared memory
+
+- 使用 shared memory，有一个问题是 input 里面没有结果，所以结果不对。
+- 还有 shared memory 访存越界了，原因是 threads, blocks 给的太大的原因。
+- 原先的 demo 有个问题是 host 端调用 kernel 没有给 shared memory。
 
