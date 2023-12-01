@@ -13,7 +13,9 @@
 // If True, host will print debugging information (e.g. thread block sizes, etc.)
 #define DEBUG_INFO 0
 
-#define USE_YH_IMPL 1
+#define STREAMS 16
+
+#define ASYNC_API 1
 
 /* Prototypes */
 
