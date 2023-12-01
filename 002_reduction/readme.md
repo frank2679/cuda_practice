@@ -1,29 +1,38 @@
 - [1. Summary](#1-summary)
   - [1.1. Tips](#11-tips)
   - [1.2. Performance](#12-performance)
+  - [1.3. Todo](#13-todo)
+  - [1.4. Reference](#14-reference)
 - [2. reduce v0](#2-reduce-v0)
   - [2.1. host 侧 kernel launch 调用](#21-host-侧-kernel-launch-调用)
   - [2.2. reduce kernel](#22-reduce-kernel)
   - [2.3. Summary](#23-summary)
-- [3. reduce v1 **coalescing**](#3-reduce-v1-coalescing)
+- [3. reduce v1 memory coalescing](#3-reduce-v1-memory-coalescing)
   - [3.1. kernel](#31-kernel)
 - [4. reduce v2 pinned memory](#4-reduce-v2-pinned-memory)
-- [5. reduce 4 shared memory](#5-reduce-4-shared-memory)
+- [5. reduce v3 multiple streams pipeline](#5-reduce-v3-multiple-streams-pipeline)
+- [6. reduce v4 shared memory](#6-reduce-v4-shared-memory)
 
 
 
-[medium, Parallel Reduction with CUDA](https://shreeraman-ak.medium.com/parallel-reduction-with-cuda-d0ae10c1ae2c)
-[github, cuda-reduction-example](https://github.com/umfranzw/cuda-reduction-example), has slides inside
 
 ## 1. Summary
 ### 1.1. Tips
 
-问题
 - 实现层面，需要在该 sync 的地方记得 sync
-- host 端每次调用要对调 input, output ? 是的，因为 kernel 假定 input 是连续的，如果不交换的话，input 里的部分和是不连续的。
+- host 端每次调用要对调 input, output ? 
+  - 是的，因为 kernel 假定 input 是连续的，如果不交换的话，input 里的部分和是不连续的。
+  - output buffer 大小是 block size，即使是 multi-stream 版本也是。
 - 交换的话，最后拿到的结果不是 dev_output 怎么办？没事，因为kernel 里面已经将结果都写入 input，output buffer，两份中都有 final sum。
 - V0 实现会导致 input 被破坏，不好，最好是不用 inplace 做法。
-- 算法层面犯了一个大错，即一 loop 中，不同 thread 读写到相同位置了。至于为什么第二次 launch 出问题的根本原因还没搞清楚。毕竟也多加了同步了。
+- 算法层面犯了一个大错，即一个 loop 中，不同 thread 读写到相同位置了。至于为什么第二次 launch 出问题的根本原因还没搞清楚。毕竟也多加了同步了。
+- 配置 grids, block_threads 配置多了一些，shared memory 版本出现内存访问报错，返回 900 错误码。
+- multi-stream 版本，input 地址记得要偏移。
+- cpu 端计算 golden 要用特定算法，确保结果正确，naive 实现容易出现大数吃小数的问题，导致累计误差暴增。
+
+当前状态
+- redeuce3 实现是基于 shared memory 的
+
 
 ### 1.2. Performance
 
@@ -34,6 +43,15 @@
 | 21   | 2885 |      |      |      |      |
 | 22   | 2261 |      |      |      |      |
 | 23   | 2383 |      |      |      |      |
+
+### 1.3. Todo
+
+- 多种优化策略，最好能够互相解耦分别验证其作用，从结果来看很多时候比较难看出性能提升的效果。
+
+### 1.4. Reference
+
+- [github, cuda-reduction-example](https://github.com/umfranzw/cuda-reduction-example), has slides inside
+- [medium, Parallel Reduction with CUDA](https://shreeraman-ak.medium.com/parallel-reduction-with-cuda-d0ae10c1ae2c)
 
 
 ## 2. reduce v0
@@ -92,7 +110,7 @@ kernel 内部不能在 block 之间做 reduce，所以需要返回 host 侧，�
 - input 数据在 global memory，被多次读取，成本较高
 
 
-## 3. reduce v1 **coalescing**
+## 3. reduce v1 memory coalescing
 
 做 global memory coalescing
 
@@ -169,7 +187,32 @@ __global__ void reduce_yh(float *input, float *output, unsigned int n) {
 
 实测性能提升很多。
 
-## 5. reduce 4 shared memory
+pinned memory 意思是 page-locked memory，不会被换入换出。
+- 它有助于提升 CPU-GPU 之间数据搬运的效率。尤其当搬运的频率较高时，适合使用该 feature。
+- 统一的 CPU-GPU 虚拟地址空间，简化内存管理和数据共享。
+- 它也有负面影响，即导致其他应用可用空间缩小，如果 pinned memory 使用过多，可能导致系统整体效率降低。
+
+
+## 5. reduce v3 multiple streams pipeline
+
+使用 stream 麻烦地方在于更多次 launch kernel ，只有 len 特别大的情况下才适用。当前这个 uint32_t 其实还不够大。
+
+另外，如何 tune 要切几份，也是个问题。
+
+当我们用 stream 做流水时，使用异步接口，如何保证数据搬运是正确的。
+
+debug
+1. 先改写成多个 stream 去做
+2. 改用异步接口
+
+根因
+1. 发现是 input 内容搞错了，地址便宜错了。
+2. output device buffer size 给错了，多个 stream 时，dev_output size 不用除以 stream，还是 blocks 
+
+发现一个奇怪的问题：用同步，异步接口对性能没有差异
+
+
+## 6. reduce v4 shared memory
 
 - 使用 shared memory，有一个问题是 input 里面没有结果，所以结果不对。
 - 还有 shared memory 访存越界了，原因是 threads, blocks 给的太大的原因。
