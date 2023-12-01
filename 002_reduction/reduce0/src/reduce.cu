@@ -124,9 +124,10 @@ int main(int argc, char *argv[]) {
   float *dev_output;
 
   // Size info for kernel launches
-  unsigned int threads_needed;
-  unsigned int blocks;
-  unsigned int remaining; // number of elements left to add
+  unsigned int threads_needed = n / 2;
+  unsigned int blocks =
+      threads_needed / block_threads + \ // we'll need this many blocks
+      (threads_needed % block_threads > 0 ? 1 : 0);
 
   // Allocate host buffer and fill it
   host_array = (float *)malloc(n * sizeof(float));
