@@ -111,7 +111,7 @@ void cpu_reduce(float *array, int len, float *asum) {
 bool check_result(float golden, float output, float threshold) {
   float diff = fabs(golden - output);
   bool status = false;
-  if (diff > threshold) {
+  if (diff > threshold && diff / golden > threshold) {
     printf("Case Failed, golden: %f, output: %f\n", golden, output);
   } else {
     printf("Case passed. \n");

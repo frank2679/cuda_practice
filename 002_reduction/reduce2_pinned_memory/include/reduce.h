@@ -11,7 +11,7 @@
 #define USE_RAND_VALS 1
 
 // If True, host will print debugging information (e.g. thread block sizes, etc.)
-#define DEBUG_INFO 1
+#define DEBUG_INFO 0
 
 #define USE_YH_IMPL 1
 
