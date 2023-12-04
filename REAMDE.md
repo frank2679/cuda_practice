@@ -1,4 +1,5 @@
-[CUDA-Optimization-Guide](https://github.com/XiaoSong9905/CUDA-Optimization-Guide)
+- [CUDA-Optimization-Guide](https://github.com/XiaoSong9905/CUDA-Optimization-Guide)
+- [Kernel Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html)
 
 
 ## cuda practice
