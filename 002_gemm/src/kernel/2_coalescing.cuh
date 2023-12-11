@@ -3,10 +3,11 @@
 
 #include "kernel_common.h"
 
-__global__ void kernel_v1_naive(int M, int N, int K, float alpha, float *A,
-                                float *B, float beta, float *C) {
-  int cCol = threadIdx.x + blockIdx.x * blockDim.x;
-  int cRow = threadIdx.y + blockIdx.y * blockDim.y;
+template <const uint BLOCKSIZE>
+__global__ void kernel_v2_coalescing(int M, int N, int K, float alpha, float *A,
+                                     float *B, float beta, float *C) {
+  int cRow = threadIdx.x + blockIdx.x * blockDim.x;
+  int cCol = threadIdx.y + blockIdx.y * blockDim.y;
 
   if (cCol < N && cRow < M) {
     float tmp = 0.f;

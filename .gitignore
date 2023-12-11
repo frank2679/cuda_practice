@@ -1,3 +1,4 @@
 *.o
 reduce
 __pycache__/
+build/

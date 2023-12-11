@@ -5,13 +5,14 @@
 #include <sys/time.h>
 
 #include "kernel/1_naive.cuh"
+#include "kernel/2_coalescing.cuh"
 #include "util.h"
 
 void test_cublas(cublasHandle_t handle, int M, int N, int K, float alpha,
                  float *A, float *B, float beta, float *C) {
   // cublas列主序计算：https://www.cnblogs.com/cuancuancuanhao/p/7763256.html
-  cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, B, N, A, K,
-              &beta, C, N);
+  cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, A, M, B, K,
+              &beta, C, M);
 }
 
 #define CEIL_DIV(M, N) ((M) + (N)-1) / (N)
@@ -20,7 +21,15 @@ void test_mysgemm_v1(int M, int N, int K, float alpha, float *A, float *B,
                      float beta, float *C) {
   dim3 blockDim(32, 32);
   dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32));
-  gemm_kernel<<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  kernel_v1_naive<<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+}
+
+void test_mysgemm_v2(int M, int N, int K, float alpha, float *A, float *B,
+                     float beta, float *C) {
+  dim3 blockDim(32, 32);
+  dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32));
+  kernel_v2_coalescing<32>
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 void test_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
@@ -32,9 +41,9 @@ void test_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 1:
     test_mysgemm_v1(M, N, K, alpha, A, B, beta, C);
     break;
-    //   case 2:
-    //     test_mysgemm_v2(M, N, K, alpha, A, B, beta, C);
-    //     break;
+  case 2:
+    test_mysgemm_v2(M, N, K, alpha, A, B, beta, C);
+    break;
     //   case 3:
     //     test_mysgemm_v3(M, N, K, alpha, A, B, beta, C);
     //     break;
