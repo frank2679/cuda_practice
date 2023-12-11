@@ -28,8 +28,7 @@ void test_mysgemm_v2(int M, int N, int K, float alpha, float *A, float *B,
                      float beta, float *C) {
   dim3 blockDim(32, 32);
   dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32));
-  kernel_v2_coalescing<32>
-      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  kernel_v2_coalescing<<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 void test_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,

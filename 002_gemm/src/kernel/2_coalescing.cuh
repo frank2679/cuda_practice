@@ -3,7 +3,6 @@
 
 #include "kernel_common.h"
 
-template <const uint BLOCKSIZE>
 __global__ void kernel_v2_coalescing(int M, int N, int K, float alpha, float *A,
                                      float *B, float beta, float *C) {
   int cRow = threadIdx.x + blockIdx.x * blockDim.x;
