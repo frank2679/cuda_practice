@@ -6,6 +6,7 @@
 
 #include "kernel/1_naive.cuh"
 #include "kernel/2_coalescing.cuh"
+#include "kernel/3_shared_memory.cuh"
 #include "util.h"
 
 void test_cublas(cublasHandle_t handle, int M, int N, int K, float alpha,
@@ -31,6 +32,14 @@ void test_mysgemm_v2(int M, int N, int K, float alpha, float *A, float *B,
   kernel_v2_coalescing<<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
+void test_mysgemm_v3(int M, int N, int K, float alpha, float *A, float *B,
+                     float beta, float *C) {
+  dim3 blockDim(32, 32);
+  dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32));
+  kernel_v3_shared_memory<32>
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+}
+
 void test_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
                  float *B, float beta, float *C, cublasHandle_t handle) {
   switch (kernel_num) {
@@ -43,9 +52,9 @@ void test_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 2:
     test_mysgemm_v2(M, N, K, alpha, A, B, beta, C);
     break;
-    //   case 3:
-    //     test_mysgemm_v3(M, N, K, alpha, A, B, beta, C);
-    //     break;
+  case 3:
+    test_mysgemm_v3(M, N, K, alpha, A, B, beta, C);
+    break;
     //   case 4:
     //     test_mysgemm_v4(M, N, K, alpha, A, B, beta, C);
     //     break;
